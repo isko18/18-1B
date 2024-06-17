@@ -10,6 +10,7 @@ from apps.telegram.models import UserCklient, Business
 from apps.telegram.management.commands.bot_instance import bot
 
 accepted_requests = set()
+declined_requests = set()
 searched_requests = set()
 
 async def edit_message_if_different(callback_query: types.CallbackQuery, new_text: str, new_reply_markup):
@@ -42,21 +43,39 @@ async def choose_region(callback_query: types.CallbackQuery, state: FSMContext):
 
 async def region_selected(callback_query: types.CallbackQuery, state: FSMContext):
     logging.info(f"Регион выбран: {callback_query.data}")
-    await state.update_data(region=callback_query.data)
+    region_map = {
+        'city_balykchy': 'Балыкчы',
+        'city_tamchy': 'Тамчы',
+        'city_chok_tal': 'Чок-Тал',
+        'city_chon_saroi': 'Чон-Сары-Ой',
+        'city_saroi': 'Сары-Ой',
+        'city_cholponata': 'Чолпон-Ата',
+        'city_bosteri': 'Бостери',
+        'city_ananeva': 'Ананьево',
+        'city_tup': 'Тюп',
+        'city_karakol': 'Каракол',
+        'city_jetiogyz': 'Джети Огуз',
+        'city_kyzyl': 'Кызыл Суу',
+        'city_tamga': 'Тамга',
+        'city_bokon': 'Боконбаева'
+    }
+    region_text = region_map.get(callback_query.data, 'Неизвестный регион')
+    await state.update_data(region=callback_query.data, region_text=region_text)
     await ClientStates.entering_date.set()
     await callback_query.answer()
     await edit_message_if_different(
         callback_query,
-        "Вы выбрали регион. Пожалуйста, введите дату заезда (дд.мм.гггг):",
+        f"Вы выбрали регион: {region_text}. Пожалуйста, введите дату заезда (дд.мм.гггг):",
         back_keyboard()
     )
 
 async def date_entered(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     region = user_data.get('region')
+    region_text = user_data.get('region_text')
     date = message.text
 
-    logging.info(f"Дата заезда введена: {date} для региона {region}")
+    logging.info(f"Дата заезда введена: {date} для региона {region_text}")
 
     await state.update_data(date=date)
     await ClientStates.entering_comment.set()
@@ -64,7 +83,7 @@ async def date_entered(message: types.Message, state: FSMContext):
 
 async def comment_entered(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
-    region = user_data.get('region')
+    region_text = user_data.get('region_text')
     date = user_data.get('date')
     comment = message.text
 
@@ -111,6 +130,7 @@ async def search_action(callback_query: types.CallbackQuery, state: FSMContext):
     searched_requests.add(request_id)
     
     region = user_data.get('region')
+    region_text = user_data.get('region_text')
     date = user_data.get('date')
     comment = user_data.get('comment')
 
@@ -122,12 +142,12 @@ async def search_action(callback_query: types.CallbackQuery, state: FSMContext):
     else:
         for business_client in business_clients:
             accept_decline_keyboard = types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton('Принять', callback_data=f'accept_{business_client.id}_{callback_query.from_user.id}'),
-                types.InlineKeyboardButton('Отклонить', callback_data=f'decline_{business_client.id}')
+                types.InlineKeyboardButton('❌ Отклонить', callback_data=f'decline_{business_client.id}_{callback_query.from_user.id}'),
+                types.InlineKeyboardButton('✅ Принять', callback_data=f'accept_{business_client.id}_{callback_query.from_user.id}'),
             )
             await bot.send_message(
                 business_client.user.user_id,  # Убедитесь, что поле user_id у вас правильно указано
-                f"Новый запрос от клиента:\n\nРегион: {region}\nДата заезда: {date}\nКомментарий: {comment}",
+                f"Новый запрос от клиента:\n\nРегион: {region_text}\nДата заезда: {date}\nКомментарий: {comment}",
                 reply_markup=accept_decline_keyboard
             )
         await callback_query.answer("Запрос отправлен бизнес-клиентам в вашем регионе.", show_alert=True)
@@ -148,7 +168,7 @@ async def handle_accept(callback_query: types.CallbackQuery, state: FSMContext):
     client_id = int(data[2])
     request_id = f"{callback_query.from_user.id}_{business_id}"
 
-    if request_id in accepted_requests:
+    if request_id in accepted_requests or request_id in declined_requests:
         await callback_query.answer("Этот запрос уже был обработан.", show_alert=True)
         return
 
@@ -156,8 +176,26 @@ async def handle_accept(callback_query: types.CallbackQuery, state: FSMContext):
     
     business_client = await sync_to_async(Business.objects.get)(id=business_id)
 
+    region_map = {
+        'city_balykchy': 'Балыкчы',
+        'city_tamchy': 'Тамчы',
+        'city_chok_tal': 'Чок-Тал',
+        'city_chon_saroi': 'Чон-Сары-Ой',
+        'city_saroi': 'Сары-Ой',
+        'city_cholponata': 'Чолпон-Ата',
+        'city_bosteri': 'Бостери',
+        'city_ananeva': 'Ананьево',
+        'city_tup': 'Тюп',
+        'city_karakol': 'Каракол',
+        'city_jetiogyz': 'Джети Огуз',
+        'city_kyzyl': 'Кызыл Суу',
+        'city_tamga': 'Тамга',
+        'city_bokon': 'Боконбаева'
+    }
+    region_text = region_map.get(business_client.region, 'Неизвестный регион')
+
     booking_details = (
-        f"Регион: {business_client.region}\n"
+        f"Регион: {region_text}\n"
         f"Пансионат: {business_client.pansionat}\n"
         f"Тип размещения: {business_client.type_accommodation}\n"
         f"Удобства: {business_client.facilities}\n"
@@ -178,6 +216,11 @@ async def handle_accept(callback_query: types.CallbackQuery, state: FSMContext):
 
     await callback_query.answer("Запрос принят и информация отправлена клиенту.", show_alert=True)
 
+    # Обновление сообщения с кнопками
+    await callback_query.message.edit_reply_markup(types.InlineKeyboardMarkup().add(
+        types.InlineKeyboardButton('✅ Принято', callback_data='accepted')
+    ))
+
     # Отправляем сообщение с предложением поиска в другом районе
     search_other_region_keyboard = types.InlineKeyboardMarkup().add(
         types.InlineKeyboardButton('Поиск в другом районе', callback_data='search_other_region')
@@ -189,6 +232,16 @@ async def handle_accept(callback_query: types.CallbackQuery, state: FSMContext):
     )
 
 async def handle_decline(callback_query: types.CallbackQuery, state: FSMContext):
+    data = callback_query.data.split('_')
+    business_id = int(data[1])
+    client_id = int(data[2])
+    request_id = f"{callback_query.from_user.id}_{business_id}"
+
+    if request_id in accepted_requests or request_id in declined_requests:
+        await callback_query.answer("Этот запрос уже был обработан.", show_alert=True)
+        return
+
+    declined_requests.add(request_id)
     await callback_query.message.delete()
     await callback_query.answer("Запрос был отклонен и сообщение удалено.", show_alert=True)
 

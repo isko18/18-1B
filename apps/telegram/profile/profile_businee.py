@@ -4,6 +4,23 @@ from asgiref.sync import sync_to_async
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apps.telegram.models import Business, UserBusiness
 
+REGION_NAMES = {
+    'city_balykchy': 'Балыкчы',
+    'city_tamchy': 'Тамчы',
+    'city_chok_tal': 'Чок-Тал',
+    'city_chon_saroi': 'Чон-Сары-Ой',
+    'city_saroi': 'Сары-Ой',
+    'city_cholponata': 'Чолпон-Ата',
+    'city_bosteri': 'Бостери',
+    'city_ananeva': 'Ананьево',
+    'city_tup': 'Тюп',
+    'city_karakol': 'Каракол',
+    'city_jetiogyz': 'Джети Огуз',
+    'city_kyzyl': 'Кызыл Суу',
+    'city_tamga': 'Тамга',
+    'city_bokon': 'Боконбаева'
+}
+
 def create_back_button(callback_data='back'):
     return InlineKeyboardMarkup().add(InlineKeyboardButton('Назад', callback_data=callback_data))
 
@@ -47,8 +64,9 @@ async def my_ads_busness(query: types.CallbackQuery):
             return
 
         for booking in ads:
+            region_name = REGION_NAMES.get(booking.region, 'Неизвестный регион')
             ad_text = f"""
-- Регион: {booking.region}
+- Регион: {region_name}
 - Пансионат: {booking.pansionat}
 - Тип размещения: {booking.type_accommodation}
 - Удобства: {booking.facilities}

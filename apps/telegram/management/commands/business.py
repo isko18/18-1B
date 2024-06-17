@@ -224,14 +224,16 @@ async def process_photos(message: types.Message, state: FSMContext):
 
     new_photo = message.photo[-1].file_id
     photos.append(new_photo)
-    photos = photos[:10]  # Ограничиваем до 10 фото
     await state.update_data(photos=photos)
 
-    remaining_photos = 10 - len(photos)
-    message_text = f"Фото {len(photos)}/10 загружено. Загрузите еще {remaining_photos} фото или нажмите 'Завершить' для завершения."
+    message_text = f"Фото загружено. Загрузите еще фото или нажмите 'Завершить' для завершения."
 
     chat_id = message.chat.id
     photo_message_id = data.get('photo_message_id')
+
+    # Удаляем предыдущее сообщение, если оно существует
+    if photo_message_id:
+        await message.bot.delete_message(chat_id, photo_message_id)
 
     msg = await message.answer(
         message_text,

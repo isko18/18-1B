@@ -24,7 +24,7 @@ class Business(models.Model):
 
 
     def __str__(self) -> str:
-        return self.pansionat
+        return self.region
     
     class Meta:
         verbose_name_plural = 'Отели Бизнесов'
