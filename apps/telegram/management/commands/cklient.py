@@ -25,7 +25,7 @@ async def client_start(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await edit_message_if_different(
         callback_query,
-        "Вы выбрали 'Я клиент'.",
+        "Здравствуйте! ☺️ Я ваш личный помощник по поиску жилья. Укажите ваши предпочтения, и я найду идеальное место для вашего отдыха. Давайте начнем путешествие вместе! 🌍✨\n\n",
         client_keyboard()
     )
     logging.info('переход')
@@ -74,7 +74,7 @@ async def comment_entered(message: types.Message, state: FSMContext):
     await ClientStates.checking_referral.set()
     await message.answer("Проверка реферальной ссылки...", reply_markup=referral_keyboard())
 
-async def check_referral(callback_query: types.CallbackQuery, state: FSMContext):
+async def check_referral_and_search(callback_query: types.CallbackQuery, state: FSMContext):
     user_data = await state.get_data()
     user_id = callback_query.from_user.id
 
@@ -86,7 +86,7 @@ async def check_referral(callback_query: types.CallbackQuery, state: FSMContext)
     if invited_count >= required_invites:
         await callback_query.message.answer("Вы успешно использовали реферальную ссылку.")
         await state.update_data(invite_check=True)
-        await state.finish()
+        await search_action(callback_query, state)  # Запуск функции поиска объявлений
     else:
         invite_link = f"https://t.me/redis_bot?start={user_id}"
         inline_keyboard = types.InlineKeyboardMarkup().add(
@@ -178,6 +178,16 @@ async def handle_accept(callback_query: types.CallbackQuery, state: FSMContext):
 
     await callback_query.answer("Запрос принят и информация отправлена клиенту.", show_alert=True)
 
+    # Отправляем сообщение с предложением поиска в другом районе
+    search_other_region_keyboard = types.InlineKeyboardMarkup().add(
+        types.InlineKeyboardButton('Поиск в другом районе', callback_data='search_other_region')
+    )
+    await bot.send_message(
+        client_id,
+        "Ожидайте еще ответы на вашу заявку. Либо попробуйте Поиск в другом районе:",
+        reply_markup=search_other_region_keyboard
+    )
+
 async def handle_decline(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.message.delete()
     await callback_query.answer("Запрос был отклонен и сообщение удалено.", show_alert=True)
@@ -216,8 +226,7 @@ def register_handlers_client(dp: Dispatcher):
     dp.register_callback_query_handler(region_selected, Text(startswith='city_'), state=ClientStates.choosing_region)
     dp.register_callback_query_handler(go_back, Text(equals='go_back'), state='*')
     dp.register_callback_query_handler(go_back, Text(equals='choose_date'), state=ClientStates.entering_comment)
-    dp.register_callback_query_handler(check_referral, Text(equals='send_referral'), state=ClientStates.checking_referral)
-    dp.register_callback_query_handler(search_action, Text(equals='search'), state='*')
+    dp.register_callback_query_handler(check_referral_and_search, Text(equals='search'), state='*')
     dp.register_callback_query_handler(search_other_region, Text(equals='search_other_region'), state='*')
     dp.register_callback_query_handler(handle_accept, Text(startswith='accept_'), state='*')
     dp.register_callback_query_handler(handle_decline, Text(startswith='decline_'), state='*')
