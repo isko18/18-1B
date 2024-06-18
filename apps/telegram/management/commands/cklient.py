@@ -117,6 +117,17 @@ async def check_referral_and_search(callback_query: types.CallbackQuery, state: 
             f"Для продолжения вам нужно пригласить хотя бы одного пользователя.\nНужно позвать {invited_count}/{required_invites}",
             reply_markup=inline_keyboard
         )
+
+        # Добавляем кнопку поиска внизу сообщения
+        search_keyboard = types.InlineKeyboardMarkup().add(
+            types.InlineKeyboardButton('Поиск', callback_data='search')
+        )
+
+        await bot.send_message(
+            callback_query.from_user.id,
+            "Как только приглашенный пользователь присоединится, вы сможете продолжить поиск:",
+            reply_markup=search_keyboard
+        )
         await state.set_state(ClientStates.checking_referral)
 
 async def search_action(callback_query: types.CallbackQuery, state: FSMContext):
