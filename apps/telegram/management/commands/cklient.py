@@ -8,18 +8,31 @@ from apps.telegram.state.cklient import ClientStates
 from apps.telegram.button.cklient import client_keyboard, back_keyboard, cklient_region_keyboard, comment_keyboard, referral_keyboard
 from apps.telegram.models import UserCklient, Business
 from apps.telegram.management.commands.bot_instance import bot
+import json
+# from business import back_to_start
 
 accepted_requests = set()
 declined_requests = set()
 searched_requests = set()
 
-async def edit_message_if_different(callback_query: types.CallbackQuery, new_text: str, new_reply_markup):
+# async def back_to_start(callback_query: types.CallbackQuery):
+#     await start(callback_query.message)
+
+async def edit_message_if_different(callback_query: types.CallbackQuery, new_text: str, new_reply_markup: types.InlineKeyboardMarkup):
     current_text = callback_query.message.text
     current_reply_markup = callback_query.message.reply_markup
+    
+    current_reply_markup_json = json.dumps(current_reply_markup.to_python() if current_reply_markup else None)
+    new_reply_markup_json = json.dumps(new_reply_markup.to_python() if new_reply_markup else None)
 
-    if current_text != new_text or current_reply_markup != new_reply_markup:
+    logging.info(f"Сравнение сообщений:\nТекущее сообщение: {current_text}\nНовое сообщение: {new_text}\nТекущая клавиатура: {current_reply_markup_json}\nНовая клавиатура: {new_reply_markup_json}")
+
+    if current_text != new_text or current_reply_markup_json != new_reply_markup_json:
+        logging.info("Сообщение будет обновлено.")
         await callback_query.message.edit_text(new_text, reply_markup=new_reply_markup)
-
+    else:
+        logging.info("Сообщение не требует обновления.")
+        
 async def client_start(callback_query: types.CallbackQuery, state: FSMContext):
     logging.info("Команда 'client_start' получена")
     await state.finish()

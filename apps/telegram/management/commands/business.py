@@ -90,8 +90,10 @@ async def start(message: types.Message):
         )
     )
 
-async def back_to_start(callback_query: types.CallbackQuery):
+async def back_to_start(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.finish()  # Reset the state
     await start(callback_query.message)
+    logging.info("Возврат к началу")
 
 async def business_start(callback_query: types.CallbackQuery):
     logging.info("Callback business_start получен")
@@ -105,8 +107,9 @@ async def business_start(callback_query: types.CallbackQuery):
 
 async def continue_handler(callback_query: types.CallbackQuery):
     logging.info("Callback continue получен")
+    keyboard = business_keyboard().add(InlineKeyboardButton('Назад', callback_data='business_start'))
+    await callback_query.message.edit_text("Выберите район:", reply_markup=keyboard)
     await BusinessForm.region.set()
-    await callback_query.message.edit_text("Выберите район:", reply_markup=business_keyboard().add(InlineKeyboardButton('Назад', callback_data='back_to_start')))
     logging.info("Ожидается выбор региона")
 
 async def process_region(callback_query: types.CallbackQuery, state: FSMContext):
@@ -169,8 +172,14 @@ async def done_selecting_amenities(query: types.CallbackQuery, state: FSMContext
     async with state.proxy() as data:
         selected_amenities = data['selected_amenities']
         amenities_text = '\n'.join(selected_amenities)
+
+    # Send a message with the selected amenities
+    await query.message.answer(f"Вы выбрали следующие удобства:\n\n{amenities_text}")
+
+    # Send a separate message prompting for the number of places
+    await query.message.answer("Введите количество мест в формате 5-9:", reply_markup=create_back_button('back_to_amenities'))
+    
     await BusinessForm.next()
-    await query.message.edit_text(f"Вы выбрали следующие удобства:\n{amenities_text}\nВведите количество мест в формате 5-9:", reply_markup=create_back_button('back_to_amenities'))
     logging.info("Ожидается ввод количества мест")
 
 async def back_to_amenities(callback_query: types.CallbackQuery, state: FSMContext):
@@ -338,12 +347,12 @@ async def invite_users_handler(query: types.CallbackQuery):
     await query.answer(f"Пожалуйста, пригласите одного пользователя и попробуйте снова.", show_alert=True)
 
 def register_handlers(dp: Dispatcher):
-    dp.register_message_handler(start, commands=['start'])
+    dp.register_message_handler(start, commands=['start'], state='*')
     dp.register_callback_query_handler(profile_busness, lambda query: query.data == 'profile_busness')
     dp.register_callback_query_handler(my_ads_busness, lambda query: query.data == 'my_ads_busness')
-    dp.register_callback_query_handler(back_to_start, lambda c: c.data == 'back_to_start')
+    dp.register_callback_query_handler(back_to_start, lambda c: c.data == 'back_to_start', state='*')
     dp.register_callback_query_handler(business_start, lambda c: c.data == 'business_start')
-    dp.register_callback_query_handler(continue_handler, lambda c: c.data == 'сontinue')
+    dp.register_callback_query_handler(continue_handler, lambda c: c.data == 'сontinue', state='*')
     dp.register_callback_query_handler(process_region, lambda c: c.data.startswith('city_'), state=BusinessForm.region)
     dp.register_callback_query_handler(back_to_region, lambda c: c.data == 'back_to_region', state=BusinessForm.pansionat)
     dp.register_message_handler(process_pansionat, state=BusinessForm.pansionat)

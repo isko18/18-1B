@@ -4,7 +4,7 @@ def client_keyboard():
     keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         InlineKeyboardButton('Выбрать регион', callback_data='choose_region'),
-        InlineKeyboardButton('Назад', callback_data='go_back')
+        InlineKeyboardButton('Назад', callback_data='back_to_start')
     )
     return keyboard
 
